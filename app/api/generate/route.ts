@@ -1,8 +1,5 @@
 import { NextResponse } from 'next/server';
-import { PDFDocument } from 'pdf-lib';
-import fontkit from '@pdf-lib/fontkit';
-import fs from 'fs';
-import path from 'path';
+import { PDFDocument, StandardFonts } from 'pdf-lib';
 
 export async function POST(request: Request) {
   try {
@@ -10,61 +7,59 @@ export async function POST(request: Request) {
 
     // Создаем PDF документ
     const pdfDoc = await PDFDocument.create();
-    pdfDoc.registerFontkit(fontkit);
-
-    // Загружаем русский шрифт
-    let font;
-    try {
-      // Путь к шрифту в проекте
-      const fontPath = path.join(process.cwd(), 'public/fonts/times.ttf');
-      
-      console.log('Поиск шрифта по пути:', fontPath);
-      
-      if (fs.existsSync(fontPath)) {
-        const fontBytes = fs.readFileSync(fontPath);
-        font = await pdfDoc.embedFont(fontBytes);
-        console.log('✅ Русский шрифт загружен успешно!');
-      } else {
-        console.log('⚠️ Шрифт не найден, используем стандартный');
-        font = await pdfDoc.embedFont('Helvetica');
-      }
-    } catch (error) {
-      console.error('Ошибка загрузки шрифта:', error);
-      font = await pdfDoc.embedFont('Helvetica');
-    }
+    
+    // Используем встроенный шрифт Helvetica
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
     // Создаем страницу A4
     const page = pdfDoc.addPage([595, 842]);
     const { width, height } = page.getSize();
 
-    // Формируем текст документа
+    // Функция для безопасного отображения текста (транслитерация)
+    function transliterate(text: string): string {
+      const map: { [key: string]: string } = {
+        'А': 'A', 'Б': 'B', 'В': 'V', 'Г': 'G', 'Д': 'D', 'Е': 'E', 'Ё': 'E',
+        'Ж': 'Zh', 'З': 'Z', 'И': 'I', 'Й': 'Y', 'К': 'K', 'Л': 'L', 'М': 'M',
+        'Н': 'N', 'О': 'O', 'П': 'P', 'Р': 'R', 'С': 'S', 'Т': 'T', 'У': 'U',
+        'Ф': 'F', 'Х': 'Kh', 'Ц': 'Ts', 'Ч': 'Ch', 'Ш': 'Sh', 'Щ': 'Shch',
+        'Ъ': '', 'Ы': 'Y', 'Ь': '', 'Э': 'E', 'Ю': 'Yu', 'Я': 'Ya',
+        'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'e',
+        'ж': 'zh', 'з': 'z', 'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm',
+        'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u',
+        'ф': 'f', 'х': 'kh', 'ц': 'ts', 'ч': 'ch', 'ш': 'sh', 'щ': 'shch',
+        'ъ': '', 'ы': 'y', 'ь': '', 'э': 'e', 'ю': 'yu', 'я': 'ya'
+      };
+      
+      return text.replace(/[А-Яа-яЁё]/g, (char) => map[char] || char);
+    }
+
+    // Формируем текст документа (с транслитерацией)
     const lines = [
-      { text: 'ДОГОВОР-ЗАЯВКА № ' + (fields.НомерДоговора || ''), size: 16, align: 'center' },
-      { text: 'от «' + (fields.ДатаДоговора || '') + '» 2026г.', size: 14, align: 'center' },
+      { text: 'DOGOVOR-ZAYAVKA № ' + (fields.НомерДоговора || ''), size: 16, align: 'center' },
+      { text: 'ot «' + (fields.ДатаДоговора || '') + '» 2026g.', size: 14, align: 'center' },
       { text: '', size: 0 },
-      { text: 'Заказчик: ' + (fields.Заказчик || ''), size: 12, align: 'left' },
-      { text: 'Директор: ' + (fields.Директор || ''), size: 12, align: 'left' },
+      { text: 'Zakazchik: ' + transliterate(fields.Заказчик || ''), size: 12, align: 'left' },
+      { text: 'Direktor: ' + transliterate(fields.Директор || ''), size: 12, align: 'left' },
       { text: '', size: 0 },
-      { text: 'МАРШРУТ ПЕРЕВОЗКИ:', size: 14, align: 'left' },
-      { text: 'Дата и время подачи авто под загрузку: ' + (fields.ДатаПодачи || ''), size: 12, align: 'left' },
-      { text: 'Адрес места загрузки: ' + (fields.АдресЗагрузки || ''), size: 12, align: 'left' },
-      { text: 'Наименование груза: ' + (fields.НаименованиеГруза || ''), size: 12, align: 'left' },
-      { text: 'Стоимость груза: ' + (fields.СтоимостьГруза || '') + ' руб.', size: 12, align: 'left' },
-      { text: 'Параметры грузовых мест: ' + (fields.РазмерыГруза || ''), size: 12, align: 'left' },
-      { text: 'Дата доставки груза получателю: ' + (fields.ДатаДоставки || ''), size: 12, align: 'left' },
-      { text: 'Получатель груза: ' + (fields.Получатель || ''), size: 12, align: 'left' },
-      { text: 'Адрес места разгрузки: ' + (fields.АдресРазгрузки || ''), size: 12, align: 'left' },
+      { text: 'MARShRUT PEREVOZKI:', size: 14, align: 'left' },
+      { text: 'Data i vremya podachi avto pod zagruzku: ' + (fields.ДатаПодачи || ''), size: 12, align: 'left' },
+      { text: 'Adres mesta zagruzki: ' + transliterate(fields.АдресЗагрузки || ''), size: 12, align: 'left' },
+      { text: 'Naimenovanie gruza: ' + transliterate(fields.НаименованиеГруза || ''), size: 12, align: 'left' },
+      { text: 'Stoimost gruza: ' + (fields.СтоимостьГруза || '') + ' rub.', size: 12, align: 'left' },
+      { text: 'Parametry gruzovyh mest: ' + transliterate(fields.РазмерыГруза || ''), size: 12, align: 'left' },
+      { text: 'Data dostavki gruza poluchatelyu: ' + (fields.ДатаДоставки || ''), size: 12, align: 'left' },
+      { text: 'Poluchatel gruza: ' + transliterate(fields.Получатель || ''), size: 12, align: 'left' },
+      { text: 'Adres mesta razgruzki: ' + transliterate(fields.АдресРазгрузки || ''), size: 12, align: 'left' },
       { text: '', size: 0 },
-      { text: 'Стоимость перевозки и срок оплаты: ' + (fields.СтоимостьПеревозки || ''), size: 12, align: 'left' },
-      { text: 'Водитель: ' + (fields.Водитель || ''), size: 12, align: 'left' },
+      { text: 'Stoimost perevozki i srok oplaty: ' + transliterate(fields.СтоимостьПеревозки || ''), size: 12, align: 'left' },
+      { text: 'Voditel: ' + transliterate(fields.Водитель || ''), size: 12, align: 'left' },
       { text: '', size: 0 },
+      { text: 'PODPISI STORON:', size: 14, align: 'left' },
+      { text: 'Perevozchik: OOO "TK Gruzovaya Kompaniya"', size: 12, align: 'left' },
+      { text: 'Direktor: Pestov V.V.', size: 12, align: 'left' },
       { text: '', size: 0 },
-      { text: 'ПОДПИСИ СТОРОН:', size: 14, align: 'left' },
-      { text: 'Перевозчик: ООО «ТК Грузовая Компания»', size: 12, align: 'left' },
-      { text: 'Директор: Пестов В.В.', size: 12, align: 'left' },
-      { text: '', size: 0 },
-      { text: 'Заказчик: ' + (fields.Заказчик || ''), size: 12, align: 'left' },
-      { text: 'Директор: ' + (fields.Директор || ''), size: 12, align: 'left' },
+      { text: 'Zakazchik: ' + transliterate(fields.Заказчик || ''), size: 12, align: 'left' },
+      { text: 'Direktor: ' + transliterate(fields.Директор || ''), size: 12, align: 'left' },
     ];
 
     let y = height - 50;
@@ -76,7 +71,6 @@ export async function POST(request: Request) {
         continue;
       }
 
-      // Если места мало - создаем новую страницу
       if (y < 50) {
         const newPage = pdfDoc.addPage([595, 842]);
         y = height - 50;
@@ -84,51 +78,28 @@ export async function POST(request: Request) {
 
       let x = 50;
       if (line.align === 'center') {
-        try {
-          const textWidth = font.widthOfTextAtSize(line.text, line.size);
-          x = (width - textWidth) / 2;
-        } catch {
-          x = 50;
-        }
+        const textWidth = font.widthOfTextAtSize(line.text, line.size);
+        x = (width - textWidth) / 2;
       }
 
-      try {
-        // Рисуем текст с русским шрифтом
-        page.drawText(line.text, {
-          x: x,
-          y: y,
-          size: line.size,
-          font: font,
-          maxWidth: width - 100,
-        });
-      } catch (error) {
-        console.error('Ошибка при отображении текста:', line.text);
-        // Пробуем отобразить без шрифта
-        try {
-          page.drawText(line.text, {
-            x: x,
-            y: y,
-            size: line.size,
-            font: await pdfDoc.embedFont('Helvetica'),
-            maxWidth: width - 100,
-          });
-        } catch (e) {
-          console.error('Не удалось отобразить текст:', line.text);
-        }
-      }
+      page.drawText(line.text, {
+        x: x,
+        y: y,
+        size: line.size,
+        font: font,
+        maxWidth: width - 100,
+      });
 
       y -= line.size > 14 ? 30 : 22;
     }
 
-    // Сохраняем PDF
     const pdfBytes = await pdfDoc.save();
 
-    // Возвращаем файл
     return new NextResponse(pdfBytes, {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename=Договор-Заявка-${fields.НомерДоговора || 'заполненный'}.pdf`,
+        'Content-Disposition': `attachment; filename=dogovor-${fields.НомерДоговора || 'zapolnennyy'}.pdf`,
         'Cache-Control': 'no-cache, no-store, must-revalidate',
       },
     });
