@@ -1,25 +1,352 @@
 import { NextResponse } from 'next/server';
-import { PDFDocument, StandardFonts } from 'pdf-lib';
+import fs from 'fs';
+import path from 'path';
+import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, BorderStyle, WidthType, HeightRule } from 'docx';
+import { PDFDocument } from 'pdf-lib';
+import fontkit from '@pdf-lib/fontkit';
 
 export async function POST(request: Request) {
   try {
     const { fields } = await request.json();
 
-    // Создаем PDF документ
-    const pdfDoc = await PDFDocument.create();
+    // Читаем шаблон DOCX
+    const templatePath = path.join(process.cwd(), 'app/templates/dogovor-zayavka.docx');
     
-    // Загружаем шрифт с поддержкой кириллицы
-    // Используем стандартный шрифт, но с поддержкой Unicode
-    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    if (!fs.existsSync(templatePath)) {
+      return NextResponse.json({ error: 'Шаблон не найден!' }, { status: 404 });
+    }
 
-    // Создаем страницу A4
+    // Создаем новый документ на основе шаблона
+    const doc = new Document({
+      sections: [{
+        properties: {},
+        children: [
+          // Заголовок
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: 'ООО «ТК ГРУЗОВАЯ КОМПАНИЯ»',
+                size: 24,
+                bold: true,
+                font: 'Times New Roman',
+              }),
+            ],
+            alignment: 'center',
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: 'Юридический Адрес: УЛИЦА НЕКРАСОВА, Д. 65, КВ./ОФ. КВ. 36, НОВОСИБИРСКАЯ ОБЛАСТЬ, Г. НОВОСИБИРСК',
+                size: 20,
+                font: 'Times New Roman',
+              }),
+            ],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: `ДОГОВОР-ЗАЯВКА № ${fields.НомерДоговора || '______'}`,
+                size: 28,
+                bold: true,
+                font: 'Times New Roman',
+              }),
+            ],
+            alignment: 'center',
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: `от «${fields.ДатаДоговора || '______'}» 2026г.`,
+                size: 24,
+                font: 'Times New Roman',
+              }),
+            ],
+            alignment: 'center',
+          }),
+          new Paragraph({ children: [new TextRun({ text: '', size: 12 })] }),
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: `Общество с ограниченной ответственностью «ТК Грузовая компания», именуемый в дальнейшем "Перевозчик", в лице директора действующий на основании Устава, с одной стороны и Общество с ограниченной ответственностью "${fields.Заказчик || '____________'}", именуемое в дальнейшем "Заказчик", в лице директора ${fields.Директор || '__________'}, действующего на основании Устава с другой стороны, заключили договор о нижеследующем:`,
+                size: 22,
+                font: 'Times New Roman',
+              }),
+            ],
+          }),
+          new Paragraph({ children: [new TextRun({ text: '', size: 12 })] }),
+          
+          // ТАБЛИЦА с данными
+          new Table({
+            rows: [
+              new TableRow({
+                children: [
+                  new TableCell({
+                    children: [new Paragraph({ children: [new TextRun({ text: 'Ответственный за перевозку со стороны Заказчика', size: 20, bold: true })] })],
+                    width: { size: 50, type: WidthType.PERCENTAGE },
+                  }),
+                  new TableCell({
+                    children: [new Paragraph({ children: [new TextRun({ text: fields.Ответственный || '__________________', size: 20 })] })],
+                    width: { size: 50, type: WidthType.PERCENTAGE },
+                  }),
+                ],
+              }),
+              new TableRow({
+                children: [
+                  new TableCell({
+                    children: [new Paragraph({ children: [new TextRun({ text: 'Маршрут перевозки', size: 20, bold: true })] })],
+                    width: { size: 50, type: WidthType.PERCENTAGE },
+                  }),
+                  new TableCell({
+                    children: [new Paragraph({ children: [new TextRun({ text: fields.Маршрут || '__________________', size: 20 })] })],
+                    width: { size: 50, type: WidthType.PERCENTAGE },
+                  }),
+                ],
+              }),
+              new TableRow({
+                children: [
+                  new TableCell({
+                    children: [new Paragraph({ children: [new TextRun({ text: 'Дата и время подачи авто под загрузку', size: 20, bold: true })] })],
+                    width: { size: 50, type: WidthType.PERCENTAGE },
+                  }),
+                  new TableCell({
+                    children: [new Paragraph({ children: [new TextRun({ text: fields.ДатаПодачи || '__________________', size: 20 })] })],
+                    width: { size: 50, type: WidthType.PERCENTAGE },
+                  }),
+                ],
+              }),
+              new TableRow({
+                children: [
+                  new TableCell({
+                    children: [new Paragraph({ children: [new TextRun({ text: 'Адрес места загрузки', size: 20, bold: true })] })],
+                    width: { size: 50, type: WidthType.PERCENTAGE },
+                  }),
+                  new TableCell({
+                    children: [new Paragraph({ children: [new TextRun({ text: fields.АдресЗагрузки || '__________________', size: 20 })] })],
+                    width: { size: 50, type: WidthType.PERCENTAGE },
+                  }),
+                ],
+              }),
+              new TableRow({
+                children: [
+                  new TableCell({
+                    children: [new Paragraph({ children: [new TextRun({ text: 'Наименование груза', size: 20, bold: true })] })],
+                    width: { size: 50, type: WidthType.PERCENTAGE },
+                  }),
+                  new TableCell({
+                    children: [new Paragraph({ children: [new TextRun({ text: fields.НаименованиеГруза || '__________________', size: 20 })] })],
+                    width: { size: 50, type: WidthType.PERCENTAGE },
+                  }),
+                ],
+              }),
+              new TableRow({
+                children: [
+                  new TableCell({
+                    children: [new Paragraph({ children: [new TextRun({ text: 'Стоимость груза', size: 20, bold: true })] })],
+                    width: { size: 50, type: WidthType.PERCENTAGE },
+                  }),
+                  new TableCell({
+                    children: [new Paragraph({ children: [new TextRun({ text: fields.СтоимостьГруза || '__________________', size: 20 })] })],
+                    width: { size: 50, type: WidthType.PERCENTAGE },
+                  }),
+                ],
+              }),
+              new TableRow({
+                children: [
+                  new TableCell({
+                    children: [new Paragraph({ children: [new TextRun({ text: 'Параметры грузовых мест', size: 20, bold: true })] })],
+                    width: { size: 50, type: WidthType.PERCENTAGE },
+                  }),
+                  new TableCell({
+                    children: [new Paragraph({ children: [new TextRun({ text: fields.РазмерыГруза || '__________________', size: 20 })] })],
+                    width: { size: 50, type: WidthType.PERCENTAGE },
+                  }),
+                ],
+              }),
+              new TableRow({
+                children: [
+                  new TableCell({
+                    children: [new Paragraph({ children: [new TextRun({ text: 'Дата доставки груза получателю', size: 20, bold: true })] })],
+                    width: { size: 50, type: WidthType.PERCENTAGE },
+                  }),
+                  new TableCell({
+                    children: [new Paragraph({ children: [new TextRun({ text: fields.ДатаДоставки || '__________________', size: 20 })] })],
+                    width: { size: 50, type: WidthType.PERCENTAGE },
+                  }),
+                ],
+              }),
+              new TableRow({
+                children: [
+                  new TableCell({
+                    children: [new Paragraph({ children: [new TextRun({ text: 'Получатель груза', size: 20, bold: true })] })],
+                    width: { size: 50, type: WidthType.PERCENTAGE },
+                  }),
+                  new TableCell({
+                    children: [new Paragraph({ children: [new TextRun({ text: fields.Получатель || '__________________', size: 20 })] })],
+                    width: { size: 50, type: WidthType.PERCENTAGE },
+                  }),
+                ],
+              }),
+              new TableRow({
+                children: [
+                  new TableCell({
+                    children: [new Paragraph({ children: [new TextRun({ text: 'Адрес места разгрузки', size: 20, bold: true })] })],
+                    width: { size: 50, type: WidthType.PERCENTAGE },
+                  }),
+                  new TableCell({
+                    children: [new Paragraph({ children: [new TextRun({ text: fields.АдресРазгрузки || '__________________', size: 20 })] })],
+                    width: { size: 50, type: WidthType.PERCENTAGE },
+                  }),
+                ],
+              }),
+              new TableRow({
+                children: [
+                  new TableCell({
+                    children: [new Paragraph({ children: [new TextRun({ text: 'Данные автотранспорта', size: 20, bold: true })] })],
+                    width: { size: 50, type: WidthType.PERCENTAGE },
+                  }),
+                  new TableCell({
+                    children: [new Paragraph({ children: [new TextRun({ text: fields.Автотранспорт || '__________________', size: 20 })] })],
+                    width: { size: 50, type: WidthType.PERCENTAGE },
+                  }),
+                ],
+              }),
+              new TableRow({
+                children: [
+                  new TableCell({
+                    children: [new Paragraph({ children: [new TextRun({ text: 'Стоимость перевозки и срок оплаты', size: 20, bold: true })] })],
+                    width: { size: 50, type: WidthType.PERCENTAGE },
+                  }),
+                  new TableCell({
+                    children: [new Paragraph({ children: [new TextRun({ text: fields.СтоимостьПеревозки || '__________________', size: 20 })] })],
+                    width: { size: 50, type: WidthType.PERCENTAGE },
+                  }),
+                ],
+              }),
+              new TableRow({
+                children: [
+                  new TableCell({
+                    children: [new Paragraph({ children: [new TextRun({ text: 'Водитель', size: 20, bold: true })] })],
+                    width: { size: 50, type: WidthType.PERCENTAGE },
+                  }),
+                  new TableCell({
+                    children: [new Paragraph({ children: [new TextRun({ text: fields.Водитель || '__________________', size: 20 })] })],
+                    width: { size: 50, type: WidthType.PERCENTAGE },
+                  }),
+                ],
+              }),
+            ],
+          }),
+          
+          new Paragraph({ children: [new TextRun({ text: '', size: 12 })] }),
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: '1. Данный договор-заявка является разовым и имеет полную юридическую силу. С чем согласны обе стороны.',
+                size: 22,
+                font: 'Times New Roman',
+              }),
+            ],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: '2. По согласованному сторонами договору-заявке "Перевозчик" обязан обеспечить подачу исправного транспортного средства к месту погрузки во время, указанное в заявке.',
+                size: 22,
+                font: 'Times New Roman',
+              }),
+            ],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: '3. За порчу, либо утрату груза, произошедшую по вине "Перевозчика" в процессе перевозки, "Перевозчик" несет полную материальную ответственность.',
+                size: 22,
+                font: 'Times New Roman',
+              }),
+            ],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: '4. "Заказчик" обязуется произвести оплату за оказанную перевозку груза в сроки и размере согласованные сторонами.',
+                size: 22,
+                font: 'Times New Roman',
+              }),
+            ],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: '5. За несвоевременную оплату перевозки "Заказчик" обязан оплатить пени в размере 0,5% от стоимости перевозки за каждый день просрочки.',
+                size: 22,
+                font: 'Times New Roman',
+              }),
+            ],
+          }),
+          new Paragraph({ children: [new TextRun({ text: '', size: 12 })] }),
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: 'РЕКВИЗИТЫ И ПОДПИСИ СТОРОН',
+                size: 24,
+                bold: true,
+                font: 'Times New Roman',
+              }),
+            ],
+            alignment: 'center',
+          }),
+          new Paragraph({ children: [new TextRun({ text: '', size: 12 })] }),
+          
+          // Подписи
+          new Table({
+            rows: [
+              new TableRow({
+                children: [
+                  new TableCell({
+                    children: [
+                      new Paragraph({ children: [new TextRun({ text: 'Перевозчик', size: 20, bold: true })] }),
+                      new Paragraph({ children: [new TextRun({ text: 'ООО «ТК Грузовая Компания»', size: 18 })] }),
+                      new Paragraph({ children: [new TextRun({ text: 'ИНН: 5406820437', size: 18 })] }),
+                      new Paragraph({ children: [new TextRun({ text: 'КПП: 540601001', size: 18 })] }),
+                      new Paragraph({ children: [new TextRun({ text: 'Директор: Пестов В.В.', size: 18 })] }),
+                      new Paragraph({ children: [new TextRun({ text: '', size: 18 })] }),
+                      new Paragraph({ children: [new TextRun({ text: '___________', size: 18 })] }),
+                      new Paragraph({ children: [new TextRun({ text: 'М.П.', size: 18 })] }),
+                    ],
+                    width: { size: 50, type: WidthType.PERCENTAGE },
+                  }),
+                  new TableCell({
+                    children: [
+                      new Paragraph({ children: [new TextRun({ text: 'Заказчик', size: 20, bold: true })] }),
+                      new Paragraph({ children: [new TextRun({ text: fields.Заказчик || '__________________', size: 18 })] }),
+                      new Paragraph({ children: [new TextRun({ text: 'Директор: ' + (fields.Директор || '__________________'), size: 18 })] }),
+                      new Paragraph({ children: [new TextRun({ text: '', size: 18 })] }),
+                      new Paragraph({ children: [new TextRun({ text: '___________', size: 18 })] }),
+                      new Paragraph({ children: [new TextRun({ text: 'М.П.', size: 18 })] }),
+                    ],
+                    width: { size: 50, type: WidthType.PERCENTAGE },
+                  }),
+                ],
+              }),
+            ],
+          }),
+        ],
+      }],
+    });
+
+    // Генерируем DOCX
+    const docxBuffer = await Packer.toBuffer(doc);
+
+    // Конвертируем DOCX в PDF
+    const pdfDoc = await PDFDocument.create();
+    pdfDoc.registerFontkit(fontkit);
+    
+    const font = await pdfDoc.embedFont('Helvetica');
     const page = pdfDoc.addPage([595, 842]);
     const { width, height } = page.getSize();
 
-    // Функция для замены русских букв на транслитерацию (только для PDF)
-    function toLatin(text: string): string {
-      if (!text) return '';
-      
+    // Транслитерируем русский текст для PDF
+    function transliterate(text: string): string {
       const map: { [key: string]: string } = {
         'А': 'A', 'Б': 'B', 'В': 'V', 'Г': 'G', 'Д': 'D', 'Е': 'E', 'Ё': 'E',
         'Ж': 'Zh', 'З': 'Z', 'И': 'I', 'Й': 'Y', 'К': 'K', 'Л': 'L', 'М': 'M',
@@ -31,93 +358,63 @@ export async function POST(request: Request) {
         'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u',
         'ф': 'f', 'х': 'kh', 'ц': 'ts', 'ч': 'ch', 'ш': 'sh', 'щ': 'shch',
         'ъ': '', 'ы': 'y', 'ь': '', 'э': 'e', 'ю': 'yu', 'я': 'ya',
-        '№': '#', '«': '"', '»': '"', '"': '',
       };
-      
-      let result = '';
-      for (const char of text) {
-        result += map[char] || char;
-      }
-      return result;
+      return text.replace(/[А-Яа-яЁё]/g, (char) => map[char] || char);
     }
 
-    // Формируем текст документа НА РУССКОМ (для отображения на сайте будем использовать русский)
-    // Но в PDF рисуем транслитерированный текст
-    const lines = [
-      { text: 'ДОГОВОР-ЗАЯВКА № ' + (fields.НомерДоговора || ''), size: 16, align: 'center', rus: true },
-      { text: 'от «' + (fields.ДатаДоговора || '') + '» 2026г.', size: 14, align: 'center', rus: true },
-      { text: '', size: 0, rus: false },
-      { text: 'Заказчик: ' + (fields.Заказчик || ''), size: 12, align: 'left', rus: true },
-      { text: 'Директор: ' + (fields.Директор || ''), size: 12, align: 'left', rus: true },
-      { text: '', size: 0, rus: false },
-      { text: 'МАРШРУТ ПЕРЕВОЗКИ:', size: 14, align: 'left', rus: true },
-      { text: 'Дата и время подачи авто: ' + (fields.ДатаПодачи || ''), size: 12, align: 'left', rus: true },
-      { text: 'Адрес загрузки: ' + (fields.АдресЗагрузки || ''), size: 12, align: 'left', rus: true },
-      { text: 'Наименование груза: ' + (fields.НаименованиеГруза || ''), size: 12, align: 'left', rus: true },
-      { text: 'Стоимость груза: ' + (fields.СтоимостьГруза || '') + ' руб.', size: 12, align: 'left', rus: true },
-      { text: 'Параметры мест: ' + (fields.РазмерыГруза || ''), size: 12, align: 'left', rus: true },
-      { text: 'Дата доставки: ' + (fields.ДатаДоставки || ''), size: 12, align: 'left', rus: true },
-      { text: 'Получатель: ' + (fields.Получатель || ''), size: 12, align: 'left', rus: true },
-      { text: 'Адрес разгрузки: ' + (fields.АдресРазгрузки || ''), size: 12, align: 'left', rus: true },
-      { text: '', size: 0, rus: false },
-      { text: 'Стоимость перевозки: ' + (fields.СтоимостьПеревозки || ''), size: 12, align: 'left', rus: true },
-      { text: 'Водитель: ' + (fields.Водитель || ''), size: 12, align: 'left', rus: true },
-      { text: '', size: 0, rus: false },
-      { text: 'ПОДПИСИ СТОРОН:', size: 14, align: 'left', rus: true },
-      { text: 'Перевозчик: ООО «ТК Грузовая Компания»', size: 12, align: 'left', rus: true },
-      { text: 'Директор: Пестов В.В.', size: 12, align: 'left', rus: true },
-      { text: '', size: 0, rus: false },
-      { text: 'Заказчик: ' + (fields.Заказчик || ''), size: 12, align: 'left', rus: true },
-      { text: 'Директор: ' + (fields.Директор || ''), size: 12, align: 'left', rus: true },
-    ];
+    // Простой текст для PDF (без таблиц, но с данными)
+    const textContent = `ДОГОВОР-ЗАЯВКА № ${fields.НомерДоговора || '______'}
+от «${fields.ДатаДоговора || '______'}» 2026г.
 
+Заказчик: ${fields.Заказчик || '__________________'}
+Директор: ${fields.Директор || '__________________'}
+
+Маршрут перевозки: ${fields.Маршрут || '__________________'}
+Дата и время подачи авто: ${fields.ДатаПодачи || '__________________'}
+Адрес загрузки: ${fields.АдресЗагрузки || '__________________'}
+Наименование груза: ${fields.НаименованиеГруза || '__________________'}
+Стоимость груза: ${fields.СтоимостьГруза || '__________________'} руб.
+Параметры грузовых мест: ${fields.РазмерыГруза || '__________________'}
+Дата доставки: ${fields.ДатаДоставки || '__________________'}
+Получатель: ${fields.Получатель || '__________________'}
+Адрес разгрузки: ${fields.АдресРазгрузки || '__________________'}
+Стоимость перевозки: ${fields.СтоимостьПеревозки || '__________________'}
+Водитель: ${fields.Водитель || '__________________'}
+
+ПОДПИСИ СТОРОН:
+Перевозчик: ООО «ТК Грузовая Компания»
+Директор: Пестов В.В.
+
+Заказчик: ${fields.Заказчик || '__________________'}
+Директор: ${fields.Директор || '__________________'}`;
+
+    const lines = textContent.split('\n');
     let y = height - 50;
 
-    // Рисуем каждую строку
     for (const line of lines) {
-      if (line.text === '') {
-        y -= 20;
-        continue;
-      }
-
       if (y < 50) {
         const newPage = pdfDoc.addPage([595, 842]);
         y = height - 50;
       }
 
-      // Если русский текст - транслитерируем
-      let displayText = line.text;
-      if (line.rus) {
-        displayText = toLatin(line.text);
-      }
-
-      let x = 50;
-      if (line.align === 'center') {
-        try {
-          const textWidth = font.widthOfTextAtSize(displayText, line.size);
-          x = (width - textWidth) / 2;
-        } catch {
-          x = 50;
-        }
-      }
-
       try {
+        const displayText = transliterate(line);
         page.drawText(displayText, {
-          x: x,
+          x: 50,
           y: y,
-          size: line.size,
+          size: 11,
           font: font,
           maxWidth: width - 100,
         });
       } catch (error) {
         console.error('Ошибка отображения:', error);
       }
-
-      y -= line.size > 14 ? 30 : 22;
+      y -= 20;
     }
 
     const pdfBytes = await pdfDoc.save();
 
+    // Возвращаем PDF
     return new NextResponse(pdfBytes, {
       status: 200,
       headers: {
