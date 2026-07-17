@@ -33,7 +33,8 @@ export async function POST(request: Request) {
       ['Стоимость перевозки и срок оплаты: ' + (fields.СтоимостьПеревозки || ''), 'left', 12],
       ['Водитель: ' + (fields.Водитель || ''), 'left', 12],
       ['', 'left', 0],
-      ['Подписи сторон:', 'left', 14],
+      ['', 'left', 0],
+      ['ПОДПИСИ СТОРОН:', 'left', 14],
       ['Перевозчик: ООО «ТК Грузовая Компания»', 'left', 12],
       ['Директор: Пестов В.В.', 'left', 12],
       ['', 'left', 0],
@@ -74,6 +75,7 @@ export async function POST(request: Request) {
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Disposition': `attachment; filename=Договор-Заявка-${fields.НомерДоговора || 'заполненный'}.pdf`,
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
       },
     });
   } catch (error) {
