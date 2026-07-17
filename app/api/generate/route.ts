@@ -8,109 +8,122 @@ export async function POST(request: Request) {
   try {
     const { fields } = await request.json();
 
-    // Создаем PDF
+    // Создаем PDF документ
     const pdfDoc = await PDFDocument.create();
     pdfDoc.registerFontkit(fontkit);
 
     // Загружаем русский шрифт
     let font;
     try {
-      // Пробуем загрузить шрифт из public/fonts/
+      // Путь к шрифту в проекте
       const fontPath = path.join(process.cwd(), 'public/fonts/times.ttf');
+      
+      console.log('Поиск шрифта по пути:', fontPath);
+      
       if (fs.existsSync(fontPath)) {
         const fontBytes = fs.readFileSync(fontPath);
         font = await pdfDoc.embedFont(fontBytes);
-        console.log('✅ Русский шрифт загружен');
+        console.log('✅ Русский шрифт загружен успешно!');
       } else {
-        // Если шрифта нет - используем стандартный (только английские буквы)
+        console.log('⚠️ Шрифт не найден, используем стандартный');
         font = await pdfDoc.embedFont('Helvetica');
-        console.log('⚠️ Используется стандартный шрифт (без кириллицы)');
       }
     } catch (error) {
       console.error('Ошибка загрузки шрифта:', error);
       font = await pdfDoc.embedFont('Helvetica');
     }
 
+    // Создаем страницу A4
     const page = pdfDoc.addPage([595, 842]);
     const { width, height } = page.getSize();
 
-    // Функция для безопасного отображения текста
-    const drawText = (text: string, x: number, y: number, size: number) => {
-      try {
-        page.drawText(text, {
-          x: x,
-          y: y,
-          size: size,
-          font: font,
-          maxWidth: width - 100,
-        });
-      } catch (error) {
-        // Если текст не отображается - пробуем без шрифта
-        console.error('Ошибка отображения текста:', text);
-      }
-    };
-
-    // Формируем документ
-    const textLines = [
-      ['ДОГОВОР-ЗАЯВКА № ' + (fields.НомерДоговора || ''), 'center', 16],
-      ['от «' + (fields.ДатаДоговора || '') + '» 2026г.', 'center', 14],
-      ['', 'left', 0],
-      ['Заказчик: ' + (fields.Заказчик || ''), 'left', 12],
-      ['Директор: ' + (fields.Директор || ''), 'left', 12],
-      ['', 'left', 0],
-      ['МАРШРУТ ПЕРЕВОЗКИ:', 'left', 14],
-      ['Дата и время подачи авто под загрузку: ' + (fields.ДатаПодачи || ''), 'left', 12],
-      ['Адрес места загрузки: ' + (fields.АдресЗагрузки || ''), 'left', 12],
-      ['Наименование груза: ' + (fields.НаименованиеГруза || ''), 'left', 12],
-      ['Стоимость груза: ' + (fields.СтоимостьГруза || '') + ' руб.', 'left', 12],
-      ['Параметры грузовых мест: ' + (fields.РазмерыГруза || ''), 'left', 12],
-      ['Дата доставки груза получателю: ' + (fields.ДатаДоставки || ''), 'left', 12],
-      ['Получатель груза: ' + (fields.Получатель || ''), 'left', 12],
-      ['Адрес места разгрузки: ' + (fields.АдресРазгрузки || ''), 'left', 12],
-      ['', 'left', 0],
-      ['Стоимость перевозки и срок оплаты: ' + (fields.СтоимостьПеревозки || ''), 'left', 12],
-      ['Водитель: ' + (fields.Водитель || ''), 'left', 12],
-      ['', 'left', 0],
-      ['', 'left', 0],
-      ['ПОДПИСИ СТОРОН:', 'left', 14],
-      ['Перевозчик: ООО «ТК Грузовая Компания»', 'left', 12],
-      ['Директор: Пестов В.В.', 'left', 12],
-      ['', 'left', 0],
-      ['Заказчик: ' + (fields.Заказчик || ''), 'left', 12],
-      ['Директор: ' + (fields.Директор || ''), 'left', 12],
+    // Формируем текст документа
+    const lines = [
+      { text: 'ДОГОВОР-ЗАЯВКА № ' + (fields.НомерДоговора || ''), size: 16, align: 'center' },
+      { text: 'от «' + (fields.ДатаДоговора || '') + '» 2026г.', size: 14, align: 'center' },
+      { text: '', size: 0 },
+      { text: 'Заказчик: ' + (fields.Заказчик || ''), size: 12, align: 'left' },
+      { text: 'Директор: ' + (fields.Директор || ''), size: 12, align: 'left' },
+      { text: '', size: 0 },
+      { text: 'МАРШРУТ ПЕРЕВОЗКИ:', size: 14, align: 'left' },
+      { text: 'Дата и время подачи авто под загрузку: ' + (fields.ДатаПодачи || ''), size: 12, align: 'left' },
+      { text: 'Адрес места загрузки: ' + (fields.АдресЗагрузки || ''), size: 12, align: 'left' },
+      { text: 'Наименование груза: ' + (fields.НаименованиеГруза || ''), size: 12, align: 'left' },
+      { text: 'Стоимость груза: ' + (fields.СтоимостьГруза || '') + ' руб.', size: 12, align: 'left' },
+      { text: 'Параметры грузовых мест: ' + (fields.РазмерыГруза || ''), size: 12, align: 'left' },
+      { text: 'Дата доставки груза получателю: ' + (fields.ДатаДоставки || ''), size: 12, align: 'left' },
+      { text: 'Получатель груза: ' + (fields.Получатель || ''), size: 12, align: 'left' },
+      { text: 'Адрес места разгрузки: ' + (fields.АдресРазгрузки || ''), size: 12, align: 'left' },
+      { text: '', size: 0 },
+      { text: 'Стоимость перевозки и срок оплаты: ' + (fields.СтоимостьПеревозки || ''), size: 12, align: 'left' },
+      { text: 'Водитель: ' + (fields.Водитель || ''), size: 12, align: 'left' },
+      { text: '', size: 0 },
+      { text: '', size: 0 },
+      { text: 'ПОДПИСИ СТОРОН:', size: 14, align: 'left' },
+      { text: 'Перевозчик: ООО «ТК Грузовая Компания»', size: 12, align: 'left' },
+      { text: 'Директор: Пестов В.В.', size: 12, align: 'left' },
+      { text: '', size: 0 },
+      { text: 'Заказчик: ' + (fields.Заказчик || ''), size: 12, align: 'left' },
+      { text: 'Директор: ' + (fields.Директор || ''), size: 12, align: 'left' },
     ];
 
     let y = height - 50;
 
-    textLines.forEach(([text, align, size]) => {
-      // Если строка пустая - просто отступаем
-      if (!text) {
-        y -= 22;
-        return;
+    // Рисуем каждую строку
+    for (const line of lines) {
+      if (line.text === '') {
+        y -= 20;
+        continue;
       }
 
+      // Если места мало - создаем новую страницу
       if (y < 50) {
         const newPage = pdfDoc.addPage([595, 842]);
         y = height - 50;
       }
 
       let x = 50;
-      if (align === 'center') {
+      if (line.align === 'center') {
         try {
-          const textWidth = font.widthOfTextAtSize(text, size);
+          const textWidth = font.widthOfTextAtSize(line.text, line.size);
           x = (width - textWidth) / 2;
         } catch {
-          // Если ошибка с шириной - ставим по центру примерно
-          x = (width - text.length * size * 0.5) / 2;
+          x = 50;
         }
       }
 
-      drawText(text, x, y, size);
-      y -= size > 14 ? 30 : 22;
-    });
+      try {
+        // Рисуем текст с русским шрифтом
+        page.drawText(line.text, {
+          x: x,
+          y: y,
+          size: line.size,
+          font: font,
+          maxWidth: width - 100,
+        });
+      } catch (error) {
+        console.error('Ошибка при отображении текста:', line.text);
+        // Пробуем отобразить без шрифта
+        try {
+          page.drawText(line.text, {
+            x: x,
+            y: y,
+            size: line.size,
+            font: await pdfDoc.embedFont('Helvetica'),
+            maxWidth: width - 100,
+          });
+        } catch (e) {
+          console.error('Не удалось отобразить текст:', line.text);
+        }
+      }
 
+      y -= line.size > 14 ? 30 : 22;
+    }
+
+    // Сохраняем PDF
     const pdfBytes = await pdfDoc.save();
 
+    // Возвращаем файл
     return new NextResponse(pdfBytes, {
       status: 200,
       headers: {
