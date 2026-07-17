@@ -1,18 +1,56 @@
 import { NextResponse } from 'next/server';
 import { PDFDocument } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
+import fs from 'fs';
+import path from 'path';
 
 export async function POST(request: Request) {
   try {
     const { fields } = await request.json();
 
+    // Создаем PDF
     const pdfDoc = await PDFDocument.create();
     pdfDoc.registerFontkit(fontkit);
-    const font = await pdfDoc.embedFont('Helvetica');
+
+    // Загружаем русский шрифт
+    let font;
+    try {
+      // Пробуем загрузить шрифт из public/fonts/
+      const fontPath = path.join(process.cwd(), 'public/fonts/times.ttf');
+      if (fs.existsSync(fontPath)) {
+        const fontBytes = fs.readFileSync(fontPath);
+        font = await pdfDoc.embedFont(fontBytes);
+        console.log('✅ Русский шрифт загружен');
+      } else {
+        // Если шрифта нет - используем стандартный (только английские буквы)
+        font = await pdfDoc.embedFont('Helvetica');
+        console.log('⚠️ Используется стандартный шрифт (без кириллицы)');
+      }
+    } catch (error) {
+      console.error('Ошибка загрузки шрифта:', error);
+      font = await pdfDoc.embedFont('Helvetica');
+    }
 
     const page = pdfDoc.addPage([595, 842]);
     const { width, height } = page.getSize();
 
+    // Функция для безопасного отображения текста
+    const drawText = (text: string, x: number, y: number, size: number) => {
+      try {
+        page.drawText(text, {
+          x: x,
+          y: y,
+          size: size,
+          font: font,
+          maxWidth: width - 100,
+        });
+      } catch (error) {
+        // Если текст не отображается - пробуем без шрифта
+        console.error('Ошибка отображения текста:', text);
+      }
+    };
+
+    // Формируем документ
     const textLines = [
       ['ДОГОВОР-ЗАЯВКА № ' + (fields.НомерДоговора || ''), 'center', 16],
       ['от «' + (fields.ДатаДоговора || '') + '» 2026г.', 'center', 14],
@@ -45,6 +83,12 @@ export async function POST(request: Request) {
     let y = height - 50;
 
     textLines.forEach(([text, align, size]) => {
+      // Если строка пустая - просто отступаем
+      if (!text) {
+        y -= 22;
+        return;
+      }
+
       if (y < 50) {
         const newPage = pdfDoc.addPage([595, 842]);
         y = height - 50;
@@ -52,19 +96,16 @@ export async function POST(request: Request) {
 
       let x = 50;
       if (align === 'center') {
-        const textWidth = font.widthOfTextAtSize(text, size);
-        x = (width - textWidth) / 2;
+        try {
+          const textWidth = font.widthOfTextAtSize(text, size);
+          x = (width - textWidth) / 2;
+        } catch {
+          // Если ошибка с шириной - ставим по центру примерно
+          x = (width - text.length * size * 0.5) / 2;
+        }
       }
 
-      if (text) {
-        page.drawText(text, {
-          x: x,
-          y: y,
-          size: size,
-          font: font,
-          maxWidth: width - 100,
-        });
-      }
+      drawText(text, x, y, size);
       y -= size > 14 ? 30 : 22;
     });
 
