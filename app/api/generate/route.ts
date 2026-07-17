@@ -15,8 +15,10 @@ export async function POST(request: Request) {
     const page = pdfDoc.addPage([595, 842]);
     const { width, height } = page.getSize();
 
-    // Функция для безопасного отображения текста (транслитерация)
+    // Функция для транслитерации русского текста
     function transliterate(text: string): string {
+      if (!text) return '';
+      
       const map: { [key: string]: string } = {
         'А': 'A', 'Б': 'B', 'В': 'V', 'Г': 'G', 'Д': 'D', 'Е': 'E', 'Ё': 'E',
         'Ж': 'Zh', 'З': 'Z', 'И': 'I', 'Й': 'Y', 'К': 'K', 'Л': 'L', 'М': 'M',
@@ -27,39 +29,59 @@ export async function POST(request: Request) {
         'ж': 'zh', 'з': 'z', 'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm',
         'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u',
         'ф': 'f', 'х': 'kh', 'ц': 'ts', 'ч': 'ch', 'ш': 'sh', 'щ': 'shch',
-        'ъ': '', 'ы': 'y', 'ь': '', 'э': 'e', 'ю': 'yu', 'я': 'ya'
+        'ъ': '', 'ы': 'y', 'ь': '', 'э': 'e', 'ю': 'yu', 'я': 'ya',
+        '№': '#', // ЗАМЕНЯЕМ № на #
+        '"': '',  // Убираем кавычки
+        '«': '',  // Убираем кавычки
+        '»': '',  // Убираем кавычки
       };
       
-      return text.replace(/[А-Яа-яЁё]/g, (char) => map[char] || char);
+      let result = '';
+      for (const char of text) {
+        result += map[char] || char;
+      }
+      return result;
     }
 
-    // Формируем текст документа (с транслитерацией)
+    // Очищаем текст от проблемных символов
+    function cleanText(text: string): string {
+      if (!text) return '';
+      return text
+        .replace(/№/g, '#')        // Заменяем № на #
+        .replace(/«/g, '"')         // Заменяем кавычки
+        .replace(/»/g, '"')         // Заменяем кавычки
+        .replace(/"/g, '')          // Убираем кавычки
+        .replace(/\n/g, ' ')        // Убираем переносы
+        .trim();
+    }
+
+    // Формируем текст документа
     const lines = [
-      { text: 'DOGOVOR-ZAYAVKA № ' + (fields.НомерДоговора || ''), size: 16, align: 'center' },
-      { text: 'ot «' + (fields.ДатаДоговора || '') + '» 2026g.', size: 14, align: 'center' },
+      { text: 'DOGOVOR-ZAYAVKA # ' + cleanText(fields.НомерДоговора || ''), size: 16, align: 'center' },
+      { text: 'ot «' + cleanText(fields.ДатаДоговора || '') + '» 2026g.', size: 14, align: 'center' },
       { text: '', size: 0 },
-      { text: 'Zakazchik: ' + transliterate(fields.Заказчик || ''), size: 12, align: 'left' },
-      { text: 'Direktor: ' + transliterate(fields.Директор || ''), size: 12, align: 'left' },
+      { text: 'Zakazchik: ' + transliterate(cleanText(fields.Заказчик || '')), size: 12, align: 'left' },
+      { text: 'Direktor: ' + transliterate(cleanText(fields.Директор || '')), size: 12, align: 'left' },
       { text: '', size: 0 },
       { text: 'MARShRUT PEREVOZKI:', size: 14, align: 'left' },
-      { text: 'Data i vremya podachi avto pod zagruzku: ' + (fields.ДатаПодачи || ''), size: 12, align: 'left' },
-      { text: 'Adres mesta zagruzki: ' + transliterate(fields.АдресЗагрузки || ''), size: 12, align: 'left' },
-      { text: 'Naimenovanie gruza: ' + transliterate(fields.НаименованиеГруза || ''), size: 12, align: 'left' },
-      { text: 'Stoimost gruza: ' + (fields.СтоимостьГруза || '') + ' rub.', size: 12, align: 'left' },
-      { text: 'Parametry gruzovyh mest: ' + transliterate(fields.РазмерыГруза || ''), size: 12, align: 'left' },
-      { text: 'Data dostavki gruza poluchatelyu: ' + (fields.ДатаДоставки || ''), size: 12, align: 'left' },
-      { text: 'Poluchatel gruza: ' + transliterate(fields.Получатель || ''), size: 12, align: 'left' },
-      { text: 'Adres mesta razgruzki: ' + transliterate(fields.АдресРазгрузки || ''), size: 12, align: 'left' },
+      { text: 'Data i vremya podachi avto: ' + cleanText(fields.ДатаПодачи || ''), size: 12, align: 'left' },
+      { text: 'Adres zagruzki: ' + transliterate(cleanText(fields.АдресЗагрузки || '')), size: 12, align: 'left' },
+      { text: 'Naimenovanie gruza: ' + transliterate(cleanText(fields.НаименованиеГруза || '')), size: 12, align: 'left' },
+      { text: 'Stoimost gruza: ' + cleanText(fields.СтоимостьГруза || '') + ' rub.', size: 12, align: 'left' },
+      { text: 'Parametry mest: ' + transliterate(cleanText(fields.РазмерыГруза || '')), size: 12, align: 'left' },
+      { text: 'Data dostavki: ' + cleanText(fields.ДатаДоставки || ''), size: 12, align: 'left' },
+      { text: 'Poluchatel: ' + transliterate(cleanText(fields.Получатель || '')), size: 12, align: 'left' },
+      { text: 'Adres razgruzki: ' + transliterate(cleanText(fields.АдресРазгрузки || '')), size: 12, align: 'left' },
       { text: '', size: 0 },
-      { text: 'Stoimost perevozki i srok oplaty: ' + transliterate(fields.СтоимостьПеревозки || ''), size: 12, align: 'left' },
-      { text: 'Voditel: ' + transliterate(fields.Водитель || ''), size: 12, align: 'left' },
+      { text: 'Stoimost perevozki: ' + transliterate(cleanText(fields.СтоимостьПеревозки || '')), size: 12, align: 'left' },
+      { text: 'Voditel: ' + transliterate(cleanText(fields.Водитель || '')), size: 12, align: 'left' },
       { text: '', size: 0 },
       { text: 'PODPISI STORON:', size: 14, align: 'left' },
       { text: 'Perevozchik: OOO "TK Gruzovaya Kompaniya"', size: 12, align: 'left' },
       { text: 'Direktor: Pestov V.V.', size: 12, align: 'left' },
       { text: '', size: 0 },
-      { text: 'Zakazchik: ' + transliterate(fields.Заказчик || ''), size: 12, align: 'left' },
-      { text: 'Direktor: ' + transliterate(fields.Директор || ''), size: 12, align: 'left' },
+      { text: 'Zakazchik: ' + transliterate(cleanText(fields.Заказчик || '')), size: 12, align: 'left' },
+      { text: 'Direktor: ' + transliterate(cleanText(fields.Директор || '')), size: 12, align: 'left' },
     ];
 
     let y = height - 50;
@@ -99,7 +121,7 @@ export async function POST(request: Request) {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename=dogovor-${fields.НомерДоговора || 'zapolnennyy'}.pdf`,
+        'Content-Disposition': `attachment; filename=dogovor-${cleanText(fields.НомерДоговора || 'zapolnennyy')}.pdf`,
         'Cache-Control': 'no-cache, no-store, must-revalidate',
       },
     });
